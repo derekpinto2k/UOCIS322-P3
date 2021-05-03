@@ -41,6 +41,7 @@ MATCHES = []
 @app.route("/index")
 def index():
     """The main page of the application"""
+    MATCHES.clear()
 
     flask.g.vocab = WORDS.as_list()
     flask.session["target_count"] = min(
@@ -67,7 +68,6 @@ def keep_going():
 
 @app.route("/success")
 def success():
-    MATCHES.clear()
     return flask.render_template('success.html')
 
 
