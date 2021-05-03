@@ -65,7 +65,17 @@
          </div>
          <div class="row">
             <div class="col-xs-6 text-center">
-               to spell {{session.target_count}} words from the list.
+               to spell
+            </div>
+         </div>
+         <div class="row">
+            <div class="col-xs-6 text-center">
+               <var id="target-count"></var>
+            </div>
+         </div>
+         <div class="row">
+            <div class="col-xs-6 text-center">
+               words from the list.
             </div>
             <!-- col -->
          </div>
@@ -73,31 +83,86 @@
          <br />
          <div class="row">
             <div class="col-xs-6 text-center">
-               <form id="entry" method="POST" action="/_check">
+               <form id="entry">
                   <label for="attempt">Word:</label>
                   <input id="attempt" name="attempt" type="text" width="15"
                      autocomplete="off"  autofocus />
-                  <input type="submit" name="try" />
                </form>
             </div>
          </div>
          <br />
-         {% if session.matches|length is not equalto 0  %}
          <h2>You found </h2>
          <p id="results">
-            {% for match in session.matches %}
-            {{ match }}
-            {% endfor %}
          </p>
-         {% endif %}
-         {% with messages = get_flashed_messages() %}
-         {% if messages %}
-         <!-- Mismatch, already found, etc. "flashed" from Python -->
-         {% for message in messages %}
-         <p class="message">{{ message }}</p>
-         {% endfor %}
-         {% endif %}
-         {% endwith %}
+         <p id="alreadyfound"></p>
+         <script>
+            var count = 3;
+            (() => {
+               document.getElementById("target-count").innerHTML = count;
+            })();
+
+            // Suppress normal form submission
+            $("#entry").submit( function(event) {
+               event.preventDefault();
+              });
+
+            $("#attempt").keyup(function(event) {
+               var txt = $("#attempt").val();  // Current content of the input field
+               var keycode = event.which;      // They key that just went up
+               var letter = String.fromCharCode(keycode);
+
+               if (! "ABCDEFGHIJKLMNOPQRSTUVWXYZ".includes(letter)) { return }
+
+               $.getJSON( "/_example", { text: txt },
+                          function(data) {
+                            rsval = data.result.key;
+                            afval = data.result.alreadyfound;
+
+                            console.log("rsval: " + rsval)
+                            if (rsval) {
+                               $("#results").append(txt + " ");
+                               $("#attempt").val("");
+                              $("#alreadyfound").html("");
+                               count = count - 1;
+                               document.getElementById("target-count").innerHTML = count;
+                            }
+                            if (afval) {
+                               $("#alreadyfound").html("Word Already Found");
+                               $("#attempt").val("");
+                            }
+
+                            if (count == 0) {
+                              window.location.replace("/success")
+                            }
+                            showTiles(txt);
+                           }
+                       );
+               });
+
+            // Demonstration of how we can insert graphical elements
+            // into a page, possibly building up the URLs of the elements
+            // dynamically.  In this case I have a set of Scrabble tiles with
+            // point values and a consistent naming scheme that allows me to
+            // generate a URL for each letter.  Browsers should cache the graphics
+            // files so that http requests are sent only the first time each
+            // element is encountered.
+            //
+            function showTiles(text) {
+               text = text.toUpperCase();  // tiles are letter-A.png, etc.
+               tiles_html = "";  // Build up the html text of links
+               for (var i=0; i < text.length; i++) {
+                   letter = text.charAt(i);
+                   if (! "ABCDEFGHIJKLMNOPQRSTUVWXYZ".includes(letter)) {
+                      continue;
+                   }
+                   var tileURL = "/static/img/letter-" + letter + ".png";
+                   var tileLink = "<img src='" + tileURL +
+                       "' style='border: 0px; margin: 0px;'/>";
+                   tiles_html = tiles_html + tileLink;
+                }
+                $("#tiles").html(tiles_html);
+            }
+         </script>
       </div>
       <!-- container -->
    </body>

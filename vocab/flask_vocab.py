@@ -7,12 +7,12 @@ from a scrambled string)
 import flask
 import logging
 
+from flask import request
 # Our modules
 from src.letterbag import LetterBag
 from src.vocab import Vocab
 from src.jumble import jumbled
 import src.config as config
-
 
 ###
 # Globals
@@ -30,6 +30,7 @@ app.secret_key = CONFIG.SECRET_KEY  # Should allow using session variables
 # neither of which would be suitable for responding keystroke by keystroke.
 
 WORDS = Vocab(CONFIG.VOCAB)
+MATCHES = []
 
 
 ###
@@ -40,6 +41,7 @@ WORDS = Vocab(CONFIG.VOCAB)
 @app.route("/index")
 def index():
     """The main page of the application"""
+
     flask.g.vocab = WORDS.as_list()
     flask.session["target_count"] = min(
         len(flask.g.vocab), CONFIG.SUCCESS_AT_COUNT)
@@ -65,6 +67,7 @@ def keep_going():
 
 @app.route("/success")
 def success():
+    MATCHES.clear()
     return flask.render_template('success.html')
 
 
@@ -74,7 +77,7 @@ def success():
 #   a JSON request handler
 #######################
 
-@app.route("/_check", methods=["POST"])
+@app.route("/_check")
 def check():
     """
     User has submitted the form with a word ('attempt')
@@ -83,7 +86,7 @@ def check():
     the word is on the vocab list (therefore correctly spelled),
     made only from the jumble letters, and not a word they
     already found.
-    """
+
     app.logger.debug("Entering check")
 
     # The data we need, from form and from cookie
@@ -111,11 +114,15 @@ def check():
         app.logger.debug("This case shouldn't happen!")
         assert False  # Raises AssertionError
 
+    ######
     # Choose page:  Solved enough, or keep going?
     if len(matches) >= flask.session["target_count"]:
-       return flask.redirect(flask.url_for("success"))
+        return flask.redirect(flask.url_for("success"))
     else:
-       return flask.redirect(flask.url_for("keep_going"))
+        return flask.redirect(flask.url_for("keep_going"))
+    #####
+"""
+    return flask.redirect(flask.url_for("success"))
 
 
 ###############
@@ -129,8 +136,24 @@ def example():
     Example ajax request handler
     """
     app.logger.debug("Got a JSON request")
-    rslt = {"key": "value"}
+    jumble = flask.session["jumble"]
+    text = request.args.get("text", type=str)
+
+    # Is it good?
+    in_jumble = LetterBag(jumble).contains(text)
+    matched = WORDS.has(text)
+
+    rslt = {"key": matched and in_jumble and not (text in MATCHES),
+            "alreadyfound": text in MATCHES}
+
+    if rslt.get("key"):
+        MATCHES.append(text)
+
     return flask.jsonify(result=rslt)
+
+
+
+
 
 
 #################
@@ -144,6 +167,7 @@ def format_filt(something):
     the Jinja2 code
     """
     return "Not what you asked for"
+
 
 ###################
 #   Error handlers
